@@ -1,5 +1,6 @@
-from blockchain.models import SearchAddress, UserAddresses
-from blockchain.api.serializers import SearchAddressSerializer, SearchTransactionSerializer, UserAddressesSerializer
+from blockchain.models import SearchAddress, UserAddresses, UserOrders
+from blockchain.api.serializers import SearchAddressSerializer, SearchTransactionSerializer, UserAddressesSerializer, \
+    UserOrdersSerializer
 from django.http import Http404
 from rest_framework.views import APIView
 from rest_framework.response import Response
@@ -118,5 +119,57 @@ class UserBalanceView(APIView):
             data = res.json()
             agg_balance = sum([data[i]['final_balance'] for i in data])
 
+            # fixme convert response into decimal BTC instead of long satoshis
             return Response({"balance": agg_balance}, status=status.HTTP_200_OK)
         return Response(status=status.HTTP_404_NOT_FOUND)
+
+
+class UserOrdersView(APIView):
+    """
+    Address marking as mine
+    You can mark an address as 'mine' using all previous (past) searches
+    """
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get_object(self, order, user_id):
+        try:
+            return UserOrders.objects.get(order=order, user=user_id)
+        except UserOrders.DoesNotExist:
+            raise Http404
+
+    def get(self, request):
+        orders = UserOrders.objects.filter(user=request.user.id)
+        serializer = UserOrdersSerializer(orders, many=True)
+        return Response(serializer.data)
+
+    def post(self, request):
+        data = {
+            'user': request.user.id,
+            'address': request.data['address'],
+            "input_amount": request.data['input_amount'],
+        }
+        serializer = UserOrdersSerializer(data=data)
+        if serializer.is_valid():
+            serializer.save()
+            return Response(serializer.data, status=status.HTTP_201_CREATED)
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+
+class UserOrderCompleteView(APIView):
+    """
+    Address marking as mine
+    You can mark an address as 'mine' using all previous (past) searches
+    """
+    permission_classes = [permissions.IsAuthenticated]
+
+    def put(self, request, order=None):
+        try:
+            order = UserOrders.objects.get(user=request.user.id, id=order)
+            order.complete()
+            order.save()
+            ser = UserOrdersSerializer(order)
+            return Response(data=ser.data)
+        except UserOrders.TransitionError as err:
+            return Response(data=err.message, status=status.HTTP_400_BAD_REQUEST)
+        except UserOrders.DoesNotExist:
+            raise Http404

@@ -5,7 +5,7 @@ from rest_framework.reverse import reverse
 from rest_framework import status
 import json
 import time
-from blockchain.api.serializers import SearchAddressSerializer
+from blockchain.api.serializers import SearchAddressSerializer, UserAddressesSerializer
 
 
 class TestSearchByAddressView(APITestCase):
@@ -167,3 +167,67 @@ class TestUserBalanceView(APITestCase):
         self.client.force_authenticate(user=None)
         response = self.client.get(self.url)
         self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
+
+
+class TestOrdersAddressesView(APITestCase):
+    def setUp(self):
+        self.user = User.objects.create_user(username='test', password="passwordTesting.123")
+        self.token = Token.objects.create(user=self.user)
+        self.api_auth()
+        self.url = reverse("blockchain_api:orders")
+        ser = SearchAddressSerializer(data={"address": "1BoatSLRHtKNngkdXEeobR76b53LETtpyT", "user": 1})
+        ser.is_valid()
+        ser.save()
+        mine = UserAddressesSerializer(data={"address": "1BoatSLRHtKNngkdXEeobR76b53LETtpyT", "user": 1})
+        mine.is_valid()
+        mine.save()
+
+    def api_auth(self):
+        self.client.credentials(HTTP_AUTHORIZATION="Token " + self.token.key)
+
+    def test_list_orders(self):
+        response = self.client.get(self.url)
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(len(json.loads(response.content)), 0)
+
+    def test_orders_unauthenticated(self):
+        self.client.force_authenticate(user=None)
+        response = self.client.get(self.url)
+        self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
+
+    def test_create_order(self):
+        data = {
+            "address": 1,
+            "input_amount": "0.123400000000000000"
+        }
+
+        response = self.client.post(self.url, data=data)
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+
+    def test_mark_order_as_complete(self):
+        data = {
+            "address": 1,
+            "input_amount": "0.123400000000000000"
+        }
+        _ = self.client.post(self.url, data=data)
+
+        url = reverse("blockchain_api:complete_order", kwargs={'order': "1"})
+        response = self.client.put(url)
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+
+    def test_mark_order_as_complete_fails_with_a_complete_order(self):
+        data = {
+            "address": 1,
+            "input_amount": "0.123400000000000000"
+        }
+        _ = self.client.post(self.url, data=data)
+
+        url = reverse("blockchain_api:complete_order", kwargs={'order': "1"})
+        _ = self.client.put(url)
+        response = self.client.put(url)
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+
+    def test_mark_order_as_complete_invalid_order_id(self):
+        url = reverse("blockchain_api:complete_order", kwargs={'order': "42"})
+        response = self.client.put(url)
+        self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)

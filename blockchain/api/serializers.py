@@ -1,5 +1,5 @@
 from rest_framework import serializers
-from blockchain.models import SearchAddress, SearchTransaction, UserAddresses
+from blockchain.models import SearchAddress, SearchTransaction, UserAddresses, UserOrders
 from rest_framework.validators import UniqueTogetherValidator
 
 
@@ -36,3 +36,17 @@ class UserAddressesSerializer(serializers.ModelSerializer):
             raise serializers.ValidationError("Invalid active address")
         return value
 
+
+class UserOrdersSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = UserOrders
+        fields = ['user', 'address', 'input_amount', 'state', 'created_at', 'updated_at', 'completed_at']
+
+    def validate(self, value):
+        orders_with_same_address = UserOrders.objects.filter(
+            user=value['user'], address=value["address"], state=UserOrders.OrderState.CREATED
+        ).all()
+
+        if len(orders_with_same_address) > 0:
+            raise serializers.ValidationError("Address already has an open order")
+        return value
