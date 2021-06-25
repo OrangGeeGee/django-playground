@@ -2,10 +2,10 @@
 
 ## How did it go notes
 
-- Struggled to launch postgres for tests.
-- Left a few `TODO` `FIXME` tags
+- Struggled to launch postgres for tests, eaten 1.5 hours of playing around. Ended up switching to SQLite for tests, but had to rush to meet the time frame in the end.
+- Left a few `TODO` `FIXME` comments
 - Finished right on time, didn't look over what would I change and how I would improve the app in detail
-- Though one suggestion was the "mine addresses" can only be created when they are first searched, this is unnecessary IMO
+- Though one suggestion was the "mine addresses" can only be created after they are first searched, this is unnecessary IMO
 
 
 ## Description of the app
